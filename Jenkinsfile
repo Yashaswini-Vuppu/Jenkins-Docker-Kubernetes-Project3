@@ -61,11 +61,15 @@ pipeline {
                     script {
                         echo "Deployment started ..."
 
-                        // ✅ Install kubectl + gke plugin if not present
+                        // Install kubectl + gke plugin if not present
                         sh '''
                             echo "Installing kubectl and gke-gcloud-auth-plugin..."
-                            sudo apt-get update -y
-                            sudo apt-get install -y kubectl google-cloud-sdk-gke-gcloud-auth-plugin
+                            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+                            chmod +x ./kubectl
+                            sudo mv ./kubectl /usr/local/bin/kubectl
+                            curl -sSL https://sdk.cloud.google.com | bash
+                            exec -l $SHELL
+                            gcloud components install gke-gcloud-auth-plugin
                         '''
 
                         // Replace tagversion with BUILD_ID
