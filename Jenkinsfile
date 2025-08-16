@@ -56,7 +56,7 @@ pipeline {
         }
         stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: 'gcp-service-account', variable: 'GCP_KEY')]) {
+                withCredentials([file(credentialsId: 'kubernetes', variable: 'GCP_KEY')]) {
                     sh '''
                         gcloud auth activate-service-account --key-file=$GCP_KEY
                         gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
