@@ -63,12 +63,15 @@ pipeline {
 
                         // Install kubectl + gke plugin if not present
                         sh '''
-                            echo "Installing kubectl and gke-gcloud-auth-plugin..."
+                            echo "Installing kubectl..."
                             curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
                             chmod +x ./kubectl
-                            sudo mv ./kubectl /usr/local/bin/kubectl
+                            mv ./kubectl $HOME/bin/kubectl
+                            export PATH=$PATH:$HOME/bin
+
+                            echo "Installing Google Cloud SDK..."
                             curl -sSL https://sdk.cloud.google.com | bash
-                            exec -l $SHELL
+                            source $HOME/google-cloud-sdk/path.bash.inc
                             gcloud components install gke-gcloud-auth-plugin
                         '''
 
