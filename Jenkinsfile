@@ -54,16 +54,18 @@ pipeline {
                 }
             }
         }
-		
-		stage('Deploy to Kubernetes') {
+        stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: "${CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
-                    sh """
-                        export KUBECONFIG=$KUBECONFIG
-                        kubectl apply -f deployment.yaml --validate=false
-                    """
+                withCredentials([file(credentialsId: 'gcp-service-account', variable: 'GCP_KEY')]) {
+                    sh '''
+                        gcloud auth activate-service-account --key-file=$GCP_KEY
+                        gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
+                        kubectl apply -f deployment.yaml
+                    '''
                 }
             }
         }
+
     }
 }
+        
