@@ -66,6 +66,9 @@ pipeline {
                             echo "Installing kubectl..."
                             curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
                             chmod +x ./kubectl
+                            
+                            # Create a directory for binaries if it doesn't exist
+                            mkdir -p $HOME/bin
                             mv ./kubectl $HOME/bin/kubectl
                             export PATH=$PATH:$HOME/bin
 
