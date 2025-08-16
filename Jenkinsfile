@@ -53,7 +53,7 @@ pipeline {
 
         stage('Deploy to K8s') {
             environment {
-                PATH = "$WORKSPACE:$PATH"
+                PATH = "$WORKSPACE:$WORKSPACE/bin:$PATH"
             }
             steps {
                 withCredentials([file(credentialsId: "${CREDENTIALS_ID}", variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
@@ -73,16 +73,22 @@ pipeline {
                             fi
                         '''
 
-                        // Install gke-gcloud-auth-plugin if not present
+                        // Install gke-gcloud-auth-plugin locally (no sudo)
                         sh '''
-                            if ! command -v gke-gcloud-auth-plugin >/dev/null 2>&1; then
-                              echo "Installing gke-gcloud-auth-plugin..."
-                              sudo apt-get update -y
-                              sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
+                            mkdir -p $WORKSPACE/bin
+                            if [ ! -f "$WORKSPACE/bin/gke-gcloud-auth-plugin" ]; then
+                              echo "Installing gke-gcloud-auth-plugin locally..."
+                              curl -LO https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-465.0.0-linux-x86_64.tar.gz
+                              tar -xzf google-cloud-cli-465.0.0-linux-x86_64.tar.gz -C $WORKSPACE
+                              mv $WORKSPACE/google-cloud-sdk/bin/gke-gcloud-auth-plugin $WORKSPACE/bin/
+                              chmod +x $WORKSPACE/bin/gke-gcloud-auth-plugin
+                              rm -rf google-cloud-cli-465.0.0-linux-x86_64.tar.gz google-cloud-sdk
+                            else
+                              echo "gke-gcloud-auth-plugin already installed"
                             fi
                         '''
 
-                        // Auth and configure cluster
+                        // Authenticate and configure cluster
                         sh '''
                             echo "Activating service account..."
                             gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
