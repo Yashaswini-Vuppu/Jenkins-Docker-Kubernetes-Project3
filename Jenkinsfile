@@ -74,7 +74,7 @@ pipeline {
 
                             echo "Installing Google Cloud SDK..."
                             curl -sSL https://sdk.cloud.google.com | bash
-                            source $HOME/google-cloud-sdk/path.bash.inc
+                            . $HOME/google-cloud-sdk/path.bash.inc
                             gcloud components install gke-gcloud-auth-plugin
                         '''
 
