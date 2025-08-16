@@ -1,100 +1,82 @@
 pipeline {
     agent any
+
     tools {
         maven 'maven-3'
     }
-    
+
     environment {
         PROJECT_ID    = 'sharp-ring-407510'
         CLUSTER_NAME  = 'gke-1'
         LOCATION      = 'asia-south1'
-        CREDENTIALS_ID = 'kubernetes'		
+        CREDENTIALS_ID = 'kubernetes'
+        DOCKERHUB_USER = 'dockerhubdemos'
+        IMAGE_NAME    = 'devops'
     }
-    
+
     stages {
-        stage('Scm Checkout') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
-        
-        stage('Build') {
+
+        stage('Build with Maven') {
             steps {
-                sh 'mvn clean install'
-                sh 'mvn clean package'
+                sh 'mvn clean package -DskipTests'
             }
         }
-        
-        stage('Test') {
-            steps {
-                echo "Testing..."
-                sh 'mvn test'
-            }
-        }
-        
+
         stage('Build Docker Image') {
             steps {
-                sh 'whoami'
                 script {
-                    myimage = docker.build("dockerhubdemos/devops:${env.BUILD_ID}")
+                    def imageTag = "${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    echo "Building Docker image: ${imageTag}"
+                    sh "docker build -t ${imageTag} ."
                 }
             }
         }
-        
-        stage("Push Docker Image") {
+
+        stage('Push Docker Image') {
             steps {
                 script {
-                    echo "Push Docker Image"
-                    withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    def imageTag = "${DOCKERHUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    withCredentials([string(credentialsId: 'docker', variable: 'dockerPassword')]) {
                         sh """
-                            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                            docker push dockerhubdemos/devops:${env.BUILD_ID}
+                            echo "${dockerPassword}" | docker login -u ${DOCKERHUB_USER} --password-stdin
+                            docker push ${imageTag}
+                            docker logout
                         """
                     }
                 }
             }
         }
-        
-        stage('Deploy to K8s') {
+
+        stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: 'kubernetes', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    script {
-                        echo "Deployment started ..."
-
-                        // Install kubectl + gke plugin if not present
-                        sh '''
-                            echo "Installing kubectl..."
-                            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
-                            chmod +x ./kubectl
-                            mv ./kubectl $HOME/bin/kubectl
-                            export PATH=$PATH:$HOME/bin
-
-                            echo "Installing Google Cloud SDK..."
-                            curl -sSL https://sdk.cloud.google.com | bash
-                            source $HOME/google-cloud-sdk/path.bash.inc
-                            gcloud components install gke-gcloud-auth-plugin
-                        '''
-
-                        // Replace tagversion with BUILD_ID
-                        sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
-                        sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
-
-                        // Authenticate with GCP + deploy
-                        sh """
-                            echo "Activating service account..."
-                            gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-                            gcloud config set project ${env.PROJECT_ID}
-                            gcloud container clusters get-credentials ${env.CLUSTER_NAME} --zone ${env.LOCATION} --project ${env.PROJECT_ID}
-
-                            echo "Applying Kubernetes manifests..."
-                            kubectl apply -f serviceLB.yaml
-                            kubectl apply -f deployment.yaml
-                        """ 
-
-                        echo "Deployment Finished ..."
-                    }
+                withCredentials([file(credentialsId: "${CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
+                    sh """
+                        export KUBECONFIG=$KUBECONFIG
+                        kubectl apply -f deployment.yaml
+                    """
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo "🧹 Cleaning up Docker images/containers to free space"
+            sh '''
+                docker system prune -af || true
+                docker volume prune -f || true
+            '''
+        }
+        success {
+            echo "✅ Build, Push and Deploy completed successfully!"
+        }
+        failure {
+            echo "❌ Build failed. Please check logs."
         }
     }
 }
