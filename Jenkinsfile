@@ -61,15 +61,17 @@ pipeline {
                     script {
                         echo "Deployment started ..."
 
-                        // ✅ Install kubectl locally (no sudo needed)
+                        // ✅ Install kubectl locally (skip if already exists)
                         sh '''
                             set -e
-                            if ! command -v kubectl >/dev/null 2>&1; then
+                            if [ ! -f "$WORKSPACE/kubectl" ]; then
                               echo "Installing kubectl..."
                               KUBECTL_VERSION=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
                               curl -LO "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
                               chmod +x kubectl
                               mv kubectl $WORKSPACE/kubectl
+                            else
+                              echo "kubectl already installed in workspace"
                             fi
                             export PATH=$WORKSPACE:$PATH
                         '''
