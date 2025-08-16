@@ -58,6 +58,7 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kubernetes', variable: 'GCP_KEY')]) {
                     sh '''
+                        export PATH=/usr/lib/google-cloud-sdk/bin:$PATH
                         gcloud auth activate-service-account --key-file=$GCP_KEY
                         gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
                         kubectl apply -f deployment.yaml
