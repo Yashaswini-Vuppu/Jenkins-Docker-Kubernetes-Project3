@@ -10,6 +10,7 @@ pipeline {
         LOCATION       = 'asia-south1'
         CREDENTIALS_ID = 'kubernetes'
         WORKSPACE_BIN  = "${env.WORKSPACE}/bin"
+        KUBECONFIG     = "${env.WORKSPACE}/kubeconfig"
     }
 
     stages {
@@ -65,18 +66,20 @@ pipeline {
                             curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-417.0.0-linux-x86_64.tar.gz | tar -xz -C "$WORKSPACE"
                             export PATH="$WORKSPACE/bin:$WORKSPACE/google-cloud-sdk/bin:$PATH"
 
-                            echo "Activating GCP service account..."
+                            echo "Activating service account..."
                             bash -c "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
                             bash -c "gcloud config set project $PROJECT_ID"
-                            bash -c "gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID"
 
-                            echo "Updating Kubernetes manifests with build ID..."
+                            echo "Generating kubeconfig..."
+                            bash -c "gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID --internal-ip=false --kubeconfig=$KUBECONFIG"
+
+                            echo "Updating Kubernetes manifests..."
                             sed -i 's/tagversion/${BUILD_ID}/g' serviceLB.yaml
                             sed -i 's/tagversion/${BUILD_ID}/g' deployment.yaml
 
                             echo "Deploying to Kubernetes..."
-                            bash -c "$WORKSPACE/bin/kubectl apply -f serviceLB.yaml"
-                            bash -c "$WORKSPACE/bin/kubectl apply -f deployment.yaml"
+                            bash -c "$WORKSPACE/bin/kubectl --kubeconfig=$KUBECONFIG apply -f serviceLB.yaml"
+                            bash -c "$WORKSPACE/bin/kubectl --kubeconfig=$KUBECONFIG apply -f deployment.yaml"
                         '''
                     }
                 }
