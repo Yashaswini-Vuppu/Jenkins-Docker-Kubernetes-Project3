@@ -76,7 +76,7 @@ pipeline {
                             rm -rf $WORKSPACE/google-cloud-sdk
                             export CLOUDSDK_INSTALL_DIR=$WORKSPACE
                             curl -sSL https://sdk.cloud.google.com | bash > /dev/null
-                            source $WORKSPACE/google-cloud-sdk/path.bash.inc
+                            . $WORKSPACE/google-cloud-sdk/path.bash.inc
 
                             gcloud components install gke-gcloud-auth-plugin -q
                         '''
