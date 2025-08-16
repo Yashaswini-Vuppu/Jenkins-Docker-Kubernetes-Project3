@@ -32,6 +32,15 @@ pipeline {
             }
         }
         
+        stage('Check Disk Space') {
+            steps {
+                script {
+                    def diskSpace = sh(script: 'df -h /', returnStdout: true).trim()
+                    echo "Current Disk Space:\n${diskSpace}"
+                }
+            }
+        }
+        
         stage('Build Docker Image') {
             steps {
                 sh 'whoami'
