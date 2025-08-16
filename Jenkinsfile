@@ -57,7 +57,7 @@ pipeline {
                             mkdir -p "$WORKSPACE/bin"
 
                             echo "Installing kubectl..."
-                            bash -c "curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+                            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
                             chmod +x kubectl
                             mv kubectl "$WORKSPACE/bin/kubectl"
 
@@ -67,19 +67,21 @@ pipeline {
                             export PATH="$WORKSPACE/bin:$WORKSPACE/google-cloud-sdk/bin:$PATH"
 
                             echo "Activating service account..."
-                            bash -c "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
-                            bash -c "gcloud config set project $PROJECT_ID"
+                            gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+                            gcloud config set project $PROJECT_ID
 
                             echo "Generating kubeconfig..."
-                            bash -c "gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID --internal-ip=false --kubeconfig=$KUBECONFIG"
+                            gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID --kubeconfig=$KUBECONFIG
 
                             echo "Updating Kubernetes manifests..."
                             sed -i 's/tagversion/${BUILD_ID}/g' serviceLB.yaml
                             sed -i 's/tagversion/${BUILD_ID}/g' deployment.yaml
 
                             echo "Deploying to Kubernetes..."
-                            bash -c "$WORKSPACE/bin/kubectl --kubeconfig=$KUBECONFIG apply -f serviceLB.yaml"
-                            bash -c "$WORKSPACE/bin/kubectl --kubeconfig=$KUBECONFIG apply -f deployment.yaml"
+                            "$WORKSPACE/bin/kubectl" --kubeconfig=$KUBECONFIG apply -f serviceLB.yaml
+                            "$WORKSPACE/bin/kubectl" --kubeconfig=$KUBECONFIG apply -f deployment.yaml
+
+                            echo "Deployment finished successfully."
                         '''
                     }
                 }
