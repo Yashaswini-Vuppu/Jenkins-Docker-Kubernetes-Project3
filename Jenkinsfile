@@ -57,18 +57,31 @@ pipeline {
 	    }
 	    
 	    stage('Deploy to K8s') {
-		    steps{
-			    echo "Deployment started ..."
-			    sh 'ls -ltr'
-			    sh 'pwd'
-			    sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
-				sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
-			    echo "Start deployment of serviceLB.yaml"
-			    step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'serviceLB.yaml', credentialsId: env.CREDENTIALS_ID, verifyDeployments: true])
-				echo "Start deployment of deployment.yaml"
-				step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'deployment.yaml', credentialsId: env.CREDENTIALS_ID, verifyDeployments: true])
-			    echo "Deployment Finished ..."
-		    }
-	    }
+             steps {
+                 withCredentials([file(credentialsId: 'kubernetes', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                     script {
+                         echo "Deployment started ..."
+                         sh 'ls -ltr'
+                         sh 'pwd'
+
+                        // Replace tagversion with BUILD_ID
+                        sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
+                        sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
+
+                        // Authenticate with GCP + deploy
+                        sh """
+                            echo "Activating service account..."
+                            gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+                            gcloud config set project ${env.PROJECT_ID}
+                            gcloud container clusters get-credentials ${env.CLUSTER_NAME} --zone ${env.LOCATION} --project ${env.PROJECT_ID}
+
+                            echo "Applying Kubernetes manifests..."
+                            kubectl apply -f serviceLB.yaml
+                            kubectl apply -f deployment.yaml
+                         """ 
+
+                         echo "Deployment Finished ..."
+            }
+        }
     }
 }
