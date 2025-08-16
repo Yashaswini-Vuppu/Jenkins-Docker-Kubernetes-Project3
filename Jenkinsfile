@@ -9,13 +9,12 @@ pipeline {
         CLUSTER_NAME   = 'gke-1'
         LOCATION       = 'asia-south1'
         CREDENTIALS_ID = 'kubernetes'
+        WORKSPACE_BIN  = "$WORKSPACE/bin"
     }
 
     stages {
         stage('Scm Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Build') {
@@ -27,14 +26,12 @@ pipeline {
 
         stage('Test') {
             steps {
-                echo "Testing..."
                 sh 'mvn test'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'whoami'
                 script {
                     myimage = docker.build("dockerhubdemos/devops:${env.BUILD_ID}")
                 }
@@ -43,14 +40,11 @@ pipeline {
 
         stage("Push Docker Image") {
             steps {
-                script {
-                    echo "Push Docker Image"
-                    withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh """
-                            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                            docker push dockerhubdemos/devops:${env.BUILD_ID}
-                        """
-                    }
+                withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                        docker push dockerhubdemos/devops:${env.BUILD_ID}
+                    """
                 }
             }
         }
@@ -59,43 +53,33 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kubernetes', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
                     script {
-                        echo "Deployment started ..."
-
-                        sh '''
+                        sh """
                             set -e
-                            BIN_DIR=$WORKSPACE/bin
-                            mkdir -p $BIN_DIR
+                            mkdir -p $WORKSPACE_BIN
 
                             echo "Installing kubectl..."
                             curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
-                            chmod +x ./kubectl
-                            mv ./kubectl $BIN_DIR/kubectl
-                            export PATH=$PATH:$BIN_DIR
+                            chmod +x kubectl
+                            mv kubectl $WORKSPACE_BIN/kubectl
 
                             echo "Installing Google Cloud SDK..."
                             rm -rf $WORKSPACE/google-cloud-sdk
-                            export CLOUDSDK_INSTALL_DIR=$WORKSPACE
-                            curl -sSL https://sdk.cloud.google.com | bash > /dev/null
-                            . $WORKSPACE/google-cloud-sdk/path.bash.inc
-
-                            gcloud components install gke-gcloud-auth-plugin -q
-                        '''
-
-                        sh """
-                            sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml
-                            sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml
+                            curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-417.0.0-linux-x86_64.tar.gz | tar -xz -C $WORKSPACE
+                            
+                            GCP_BIN="$WORKSPACE/google-cloud-sdk/bin"
+                            export PATH=$WORKSPACE_BIN:$GCP_BIN:\$PATH
 
                             echo "Activating service account..."
-                            gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
-                            gcloud config set project ${env.PROJECT_ID}
-                            gcloud container clusters get-credentials ${env.CLUSTER_NAME} --zone ${env.LOCATION} --project ${env.PROJECT_ID}
+                            bash -c "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+                            bash -c "gcloud config set project $PROJECT_ID"
+                            bash -c "gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID"
 
                             echo "Applying Kubernetes manifests..."
-                            kubectl apply -f serviceLB.yaml
-                            kubectl apply -f deployment.yaml
+                            sed -i 's/tagversion/${BUILD_ID}/g' serviceLB.yaml
+                            sed -i 's/tagversion/${BUILD_ID}/g' deployment.yaml
+                            bash -c "kubectl apply -f serviceLB.yaml"
+                            bash -c "kubectl apply -f deployment.yaml"
                         """
-
-                        echo "Deployment Finished ..."
                     }
                 }
             }
