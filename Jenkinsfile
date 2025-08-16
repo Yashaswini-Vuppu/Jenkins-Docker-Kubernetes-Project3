@@ -63,20 +63,4 @@ pipeline {
             }
         }
     }
-
-    post {
-        always {
-            echo "🧹 Cleaning up Docker images/containers to free space"
-            sh '''
-                docker system prune -af || true
-                docker volume prune -f || true
-            '''
-        }
-        success {
-            echo "✅ Build, Push and Deploy completed successfully!"
-        }
-        failure {
-            echo "❌ Build failed. Please check logs."
-        }
-    }
 }
