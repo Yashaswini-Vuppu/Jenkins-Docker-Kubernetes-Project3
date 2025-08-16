@@ -9,11 +9,11 @@ pipeline {
         CLUSTER_NAME   = 'gke-1'
         LOCATION       = 'asia-south1'
         CREDENTIALS_ID = 'kubernetes'
-        WORKSPACE_BIN  = "$WORKSPACE/bin"
+        WORKSPACE_BIN  = "${env.WORKSPACE}/bin"
     }
 
     stages {
-        stage('Scm Checkout') {
+        stage('SCM Checkout') {
             steps { checkout scm }
         }
 
@@ -25,9 +25,7 @@ pipeline {
         }
 
         stage('Test') {
-            steps {
-                sh 'mvn test'
-            }
+            steps { sh 'mvn test' }
         }
 
         stage('Build Docker Image') {
@@ -38,11 +36,11 @@ pipeline {
             }
         }
 
-        stage("Push Docker Image") {
+        stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
-                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
                         docker push dockerhubdemos/devops:${env.BUILD_ID}
                     """
                 }
@@ -53,33 +51,33 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'kubernetes', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
                     script {
-                        sh """
+                        sh '''
                             set -e
-                            mkdir -p $WORKSPACE_BIN
+                            mkdir -p "$WORKSPACE/bin"
 
                             echo "Installing kubectl..."
-                            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+                            bash -c "curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
                             chmod +x kubectl
-                            mv kubectl $WORKSPACE_BIN/kubectl
+                            mv kubectl "$WORKSPACE/bin/kubectl"
 
                             echo "Installing Google Cloud SDK..."
-                            rm -rf $WORKSPACE/google-cloud-sdk
-                            curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-417.0.0-linux-x86_64.tar.gz | tar -xz -C $WORKSPACE
-                            
-                            GCP_BIN="$WORKSPACE/google-cloud-sdk/bin"
-                            export PATH=$WORKSPACE_BIN:$GCP_BIN:\$PATH
+                            rm -rf "$WORKSPACE/google-cloud-sdk"
+                            curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-417.0.0-linux-x86_64.tar.gz | tar -xz -C "$WORKSPACE"
+                            export PATH="$WORKSPACE/bin:$WORKSPACE/google-cloud-sdk/bin:$PATH"
 
-                            echo "Activating service account..."
+                            echo "Activating GCP service account..."
                             bash -c "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
                             bash -c "gcloud config set project $PROJECT_ID"
                             bash -c "gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID"
 
-                            echo "Applying Kubernetes manifests..."
+                            echo "Updating Kubernetes manifests with build ID..."
                             sed -i 's/tagversion/${BUILD_ID}/g' serviceLB.yaml
                             sed -i 's/tagversion/${BUILD_ID}/g' deployment.yaml
-                            bash -c "kubectl apply -f serviceLB.yaml"
-                            bash -c "kubectl apply -f deployment.yaml"
-                        """
+
+                            echo "Deploying to Kubernetes..."
+                            bash -c "$WORKSPACE/bin/kubectl apply -f serviceLB.yaml"
+                            bash -c "$WORKSPACE/bin/kubectl apply -f deployment.yaml"
+                        '''
                     }
                 }
             }
