@@ -8,11 +8,11 @@ pipeline {
         PROJECT_ID    = 'sharp-ring-407510'
         CLUSTER_NAME  = 'gke-1'
         LOCATION      = 'asia-south1'
-        CREDENTIALS_ID = 'kubernetes'		
+        CREDENTIALS_ID = 'kubernetes'
     }
     
     stages {
-        stage('Scm Checkout') {
+        stage('SCM Checkout') {
             steps {
                 checkout scm
             }
@@ -27,7 +27,7 @@ pipeline {
         
         stage('Test') {
             steps {
-                echo "Testing..."
+                echo "Running tests..."
                 sh 'mvn test'
             }
         }
@@ -41,10 +41,10 @@ pipeline {
             }
         }
         
-        stage("Push Docker Image") {
+        stage('Push Docker Image') {
             steps {
                 script {
-                    echo "Push Docker Image"
+                    echo "Pushing Docker Image..."
                     withCredentials([usernamePassword(credentialsId: 'docker', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh """
                             echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
@@ -56,18 +56,25 @@ pipeline {
         }
         
         stage('Deploy to K8s') {
-		    steps{
-			    echo "Deployment started ..."
-			    sh 'ls -ltr'
-			    sh 'pwd'
-			    sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
-				sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
-			    echo "Start deployment of serviceLB.yaml"
-			    step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'serviceLB.yaml', credentialsId: env.CREDENTIALS_ID, verifyDeployments: true])
-				echo "Start deployment of deployment.yaml"
-				step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'deployment.yaml', credentialsId: env.CREDENTIALS_ID, verifyDeployments: true])
-			    echo "Deployment Finished ..."
-                    }
+            steps {
+                echo "Starting deployment to Kubernetes..."
+                withCredentials([file(credentialsId: env.CREDENTIALS_ID, variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                    sh '''
+                        # Authenticate with GCP
+                        gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+                        gcloud container clusters get-credentials $CLUSTER_NAME --zone $LOCATION --project $PROJECT_ID
+
+                        # Update image tags in YAML files
+                        sed -i "s/tagversion/${BUILD_ID}/g" serviceLB.yaml
+                        sed -i "s/tagversion/${BUILD_ID}/g" deployment.yaml
+
+                        # Apply manifests
+                        kubectl apply -f serviceLB.yaml
+                        kubectl apply -f deployment.yaml
+                    '''
                 }
+                echo "Deployment completed."
             }
         }
+    }
+}
