@@ -3,35 +3,35 @@ pipeline {
     tools {
         maven 'maven-3'
     }
-    
+
     environment {
-        PROJECT_ID    = 'sharp-ring-407510'
-        CLUSTER_NAME  = 'gke-1'
-        LOCATION      = 'asia-south1'
-        CREDENTIALS_ID = 'kubernetes'		
+        PROJECT_ID     = 'sharp-ring-407510'
+        CLUSTER_NAME   = 'gke-1'
+        LOCATION       = 'asia-south1'
+        CREDENTIALS_ID = 'kubernetes'
     }
-    
+
     stages {
         stage('Scm Checkout') {
             steps {
                 checkout scm
             }
         }
-        
+
         stage('Build') {
             steps {
                 sh 'mvn clean install'
                 sh 'mvn clean package'
             }
         }
-        
+
         stage('Test') {
             steps {
                 echo "Testing..."
                 sh 'mvn test'
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
                 sh 'whoami'
@@ -40,7 +40,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage("Push Docker Image") {
             steps {
                 script {
@@ -54,33 +54,37 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Deploy to K8s') {
             steps {
                 withCredentials([file(credentialsId: 'kubernetes', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
                     script {
                         echo "Deployment started ..."
 
-                        // Install kubectl + gke plugin if not present
                         sh '''
+                            set -e
+                            BIN_DIR=$WORKSPACE/bin
+                            mkdir -p $BIN_DIR
+
                             echo "Installing kubectl..."
                             curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
                             chmod +x ./kubectl
-                            mv ./kubectl $HOME/bin/kubectl
-                            export PATH=$PATH:$HOME/bin
+                            mv ./kubectl $BIN_DIR/kubectl
+                            export PATH=$PATH:$BIN_DIR
 
                             echo "Installing Google Cloud SDK..."
-                            curl -sSL https://sdk.cloud.google.com | bash
-                            source $HOME/google-cloud-sdk/path.bash.inc
-                            gcloud components install gke-gcloud-auth-plugin
+                            rm -rf $WORKSPACE/google-cloud-sdk
+                            curl -sSL https://sdk.cloud.google.com | bash > /dev/null
+                            mv google-cloud-sdk $WORKSPACE/google-cloud-sdk
+                            source $WORKSPACE/google-cloud-sdk/path.bash.inc
+
+                            gcloud components install gke-gcloud-auth-plugin -q
                         '''
 
-                        // Replace tagversion with BUILD_ID
-                        sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
-                        sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
-
-                        // Authenticate with GCP + deploy
                         sh """
+                            sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml
+                            sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml
+
                             echo "Activating service account..."
                             gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
                             gcloud config set project ${env.PROJECT_ID}
@@ -89,7 +93,7 @@ pipeline {
                             echo "Applying Kubernetes manifests..."
                             kubectl apply -f serviceLB.yaml
                             kubectl apply -f deployment.yaml
-                        """ 
+                        """
 
                         echo "Deployment Finished ..."
                     }
