@@ -5,10 +5,10 @@ pipeline {
     }
     
     environment {
-        PROJECT_ID    = 'sharp-ring-407510'
-        CLUSTER_NAME  = 'gke-1'
-        LOCATION      = 'asia-south1'
-        CREDENTIALS_ID = 'kubernetes'		
+        PROJECT_ID     = 'sharp-ring-407510'
+        CLUSTER_NAME   = 'gke-1'
+        LOCATION       = 'asia-south1'
+        CREDENTIALS_ID = 'kubernetes'
     }
     
     stages {
@@ -61,18 +61,23 @@ pipeline {
                     script {
                         echo "Deployment started ..."
 
-                        // ✅ Install kubectl + gke plugin if not present
+                        // ✅ Install kubectl locally (no sudo)
                         sh '''
-                            echo "Installing kubectl and gke-gcloud-auth-plugin..."
-                            sudo apt-get update -y
-                            sudo apt-get install -y kubectl google-cloud-sdk-gke-gcloud-auth-plugin
+                            set -e
+                            if ! command -v kubectl >/dev/null 2>&1; then
+                              echo "Installing kubectl..."
+                              curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                              chmod +x kubectl
+                              mv kubectl $WORKSPACE/kubectl
+                            fi
+                            export PATH=$WORKSPACE:$PATH
                         '''
 
-                        // Replace tagversion with BUILD_ID
+                        // ✅ Replace tagversion with BUILD_ID in yaml files
                         sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
                         sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
 
-                        // Authenticate with GCP + deploy
+                        // ✅ Authenticate with GCP + deploy
                         sh """
                             echo "Activating service account..."
                             gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
@@ -80,8 +85,8 @@ pipeline {
                             gcloud container clusters get-credentials ${env.CLUSTER_NAME} --zone ${env.LOCATION} --project ${env.PROJECT_ID}
 
                             echo "Applying Kubernetes manifests..."
-                            kubectl apply -f serviceLB.yaml
-                            kubectl apply -f deployment.yaml
+                            $WORKSPACE/kubectl apply -f serviceLB.yaml
+                            $WORKSPACE/kubectl apply -f deployment.yaml
                         """ 
 
                         echo "Deployment Finished ..."
