@@ -1,13 +1,13 @@
 pipeline {
     agent any
 	tools {
-		maven 'Maven'
+		maven 'maven-3'
 	}
 	
 	environment {
-		PROJECT_ID = 'jenkins-296812'
-                CLUSTER_NAME = 'k8s-cluster'
-                LOCATION = 'us-central1-c'
+		        PROJECT_ID = 'sharp-ring-407510'
+                CLUSTER_NAME = 'gke-1'
+                LOCATION = 'asia-south1'
                 CREDENTIALS_ID = 'kubernetes'		
 	}
 	
@@ -35,7 +35,7 @@ pipeline {
 		    steps {
 			    sh 'whoami'
 			    script {
-				    myimage = docker.build("ameintu/devops:${env.BUILD_ID}")
+				    myimage = docker.build("dockerhubdemos/devops:${env.BUILD_ID}")
 			    }
 		    }
 	    }
@@ -44,8 +44,8 @@ pipeline {
 		    steps {
 			    script {
 				    echo "Push Docker Image"
-				    withCredentials([string(credentialsId: 'dockerhub', variable: 'dockerhub')]) {
-            				sh "docker login -u ameintu -p ${dockerhub}"
+				    withCredentials([string(credentialsId: 'docker', variable: 'docker')]) {
+						    sh "docker login -u dockerhubdemos -p ${docker}"
 				    }
 				        myimage.push("${env.BUILD_ID}")
 				    
