@@ -1,38 +1,38 @@
 pipeline {
     agent any
+
     tools {
         maven 'maven-3'
-        gcloud 'gcloud-sdk'
     }
-    
+
     environment {
-        PROJECT_ID    = 'sharp-ring-407510'
-        CLUSTER_NAME  = 'gke-1'
-        LOCATION      = 'asia-south1'
-        CREDENTIALS_ID = 'kubernetes'		
+        PROJECT_ID = 'sharp-ring-407510'
+        CLUSTER_NAME = 'gke-1'
+        LOCATION = 'asia-south1'
+        CREDENTIALS_ID = 'kubernetes'
     }
-    
+
     stages {
         stage('Scm Checkout') {
             steps {
                 checkout scm
             }
         }
-        
+
         stage('Build') {
             steps {
                 sh 'mvn clean install'
                 sh 'mvn clean package'
             }
         }
-        
+
         stage('Test') {
             steps {
                 echo "Testing..."
                 sh 'mvn test'
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
                 sh 'whoami'
@@ -41,7 +41,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage("Push Docker Image") {
             steps {
                 script {
@@ -55,19 +55,22 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy to Kubernetes') {
             steps {
-                withCredentials([file(credentialsId: 'kubernetes', variable: 'GCP_KEY')]) {
-                    sh '''
-                        export PATH=/usr/lib/google-cloud-sdk/bin:$PATH
-                        gcloud auth activate-service-account --key-file=$GCP_KEY
-                        gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
-                        kubectl apply -f deployment.yaml
-                    '''
+                script {
+                    def gcloudHome = tool name: 'gcloud-sdk', type: 'hudson.plugins.google.gcloud.gcloudsdkinstaller.GcloudSdkInstaller'
+                    withEnv(["PATH+GCLOUD_SDK=${gcloudHome}/bin"]) {
+                        withCredentials([file(credentialsId: 'kubernetes', variable: 'GCP_KEY')]) {
+                            sh '''
+                                gcloud auth activate-service-account --key-file=$GCP_KEY
+                                gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
+                                kubectl apply -f deployment.yaml
+                            '''
+                        }
+                    }
                 }
             }
         }
-
     }
 }
-        
