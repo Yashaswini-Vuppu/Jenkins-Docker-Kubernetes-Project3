@@ -1,46 +1,47 @@
 pipeline {
     agent any
-
     tools {
         maven 'maven-3'
+        gcloud 'gcloud-sdk'
     }
-
+    
     environment {
-        PROJECT_ID = 'sharp-ring-407510'
-        CLUSTER_NAME = 'gke-1'
-        LOCATION = 'asia-south1'
-        CREDENTIALS_ID = 'kubernetes'
+        PROJECT_ID    = 'sharp-ring-407510'
+        CLUSTER_NAME  = 'gke-1'
+        LOCATION      = 'asia-south1'
+        CREDENTIALS_ID = 'kubernetes'		
     }
-
+    
     stages {
         stage('Scm Checkout') {
             steps {
                 checkout scm
             }
         }
-
+        
         stage('Build') {
             steps {
                 sh 'mvn clean install'
                 sh 'mvn clean package'
             }
         }
-
+        
         stage('Test') {
             steps {
                 echo "Testing..."
                 sh 'mvn test'
             }
         }
-
+        
         stage('Build Docker Image') {
             steps {
+                sh 'whoami'
                 script {
                     myimage = docker.build("dockerhubdemos/devops:${env.BUILD_ID}")
                 }
             }
         }
-
+        
         stage("Push Docker Image") {
             steps {
                 script {
@@ -54,31 +55,20 @@ pipeline {
                 }
             }
         }
-
-        stage('Debug Environment') {
-            steps {
-                sh 'echo "Debugging PATH..."'
-                sh 'echo $PATH'
-                sh 'echo "Listing gcloud-sdk directory..."'
-                sh 'ls -l /var/lib/jenkins/tools/hudson.plugins.google.gcloud.gcloudsdkinstaller.GcloudSdkInstaller/gcloud-sdk/google-cloud-sdk/bin'
+        stage('Deploy to K8s') {
+		    steps{
+			    echo "Deployment started ..."
+			    sh 'ls -ltr'
+			    sh 'pwd'
+			    sh "sed -i 's/tagversion/${env.BUILD_ID}/g' serviceLB.yaml"
+				sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
+			    echo "Start deployment of serviceLB.yaml"
+			    step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'serviceLB.yaml', credentialsId: env.CREDENTIALS_ID, verifyDeployments: true])
+				echo "Start deployment of deployment.yaml"
+				step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'deployment.yaml', credentialsId: env.CREDENTIALS_ID, verifyDeployments: true])
+			    echo "Deployment Finished ..."
             }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    withEnv(["GCP_PATH=${tool 'gcloud-sdk'}"]) {
-                        withCredentials([file(credentialsId: 'kubernetes', variable: 'GCP_KEY')]) {
-                            sh '''
-                                export PATH=$GCP_PATH/bin:$PATH
-                                gcloud auth activate-service-account --key-file=$GCP_KEY
-                                gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
-                                kubectl apply -f deployment.yaml
-                            '''
-                        }
-                    }
-                }
-            }
-        }
+		}
     }
 }
+        
