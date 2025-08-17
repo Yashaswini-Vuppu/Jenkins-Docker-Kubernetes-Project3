@@ -35,7 +35,6 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'whoami'
                 script {
                     myimage = docker.build("dockerhubdemos/devops:${env.BUILD_ID}")
                 }
@@ -59,10 +58,10 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    def gcloudHome = tool name: 'gcloud-sdk', type: 'hudson.plugins.google.gcloud.gcloudsdkinstaller.GcloudSdkInstaller'
-                    withEnv(["PATH+GCLOUD_SDK=${gcloudHome}/bin"]) {
+                    withEnv(["GCP_PATH=${tool 'gcloud-sdk'}"]) {
                         withCredentials([file(credentialsId: 'kubernetes', variable: 'GCP_KEY')]) {
                             sh '''
+                                export PATH=$GCP_PATH/bin:$PATH
                                 gcloud auth activate-service-account --key-file=$GCP_KEY
                                 gcloud container clusters get-credentials ${CLUSTER_NAME} --zone ${LOCATION} --project ${PROJECT_ID}
                                 kubectl apply -f deployment.yaml
