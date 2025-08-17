@@ -1,35 +1,12 @@
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
- name: myapp-deployment-loadbalancer
- labels:
-  app: myapp-app-loadbalancer
-spec:
- replicas: 1
- selector:
-  matchLabels:
-   app: myapp-app-loadbalancer
- template:
-  metadata: 
-   labels:
-    app: myapp-app-loadbalancer
-  spec:
-   containers:
-   - name: myapp-app-loadbalancer
-     image: ameintu/devops:tagversion
-     ports:
-     - containerPort: 8080
-
----
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp-service-loadbalancer
+  name: myapp-service # Changed name for clarity, though 'myapp' is fine if consistent
 spec:
   type: LoadBalancer
   selector:
-    app: myapp-app-loadbalancer
+    app: myapp # This must match the 'app' label in your Deployment's pod template
   ports:
     - protocol: TCP
       port: 80
