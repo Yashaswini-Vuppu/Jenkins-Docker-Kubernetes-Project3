@@ -60,12 +60,13 @@ pipeline {
                 echo "Deployment started ..."
                 sh 'ls -ltr'
                 sh 'pwd'
-                // Apply BUILD_ID to the deployment.yaml, as service.yaml doesn't need it
+                // Apply BUILD_ID to the deployment.yaml, as serviceLB.yaml doesn't need it
                 sh "sed -i 's/tagversion/${env.BUILD_ID}/g' deployment.yaml"
                 
-                echo "Start deployment of service.yaml"
+                echo "Start deployment of serviceLB.yaml"
                 // Deploy the Service first. No verification needed for a Service.
-                step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'service.yaml', credentialsId: env.CREDENTIALS_ID])
+                // **** IMPORTANT: Changed 'service.yaml' to 'serviceLB.yaml' here ****
+                step([$class: 'KubernetesEngineBuilder', projectId: env.PROJECT_ID, clusterName: env.CLUSTER_NAME, location: env.LOCATION, manifestPattern: 'serviceLB.yaml', credentialsId: env.CREDENTIALS_ID])
                 
                 echo "Start deployment of deployment.yaml"
                 // Deploy the Deployment second, and verify its readiness.
