@@ -55,6 +55,15 @@ pipeline {
             }
         }
 
+        stage('Debug Environment') {
+            steps {
+                sh 'echo "Debugging PATH..."'
+                sh 'echo $PATH'
+                sh 'echo "Listing gcloud-sdk directory..."'
+                sh 'ls -l /var/lib/jenkins/tools/hudson.plugins.google.gcloud.gcloudsdkinstaller.GcloudSdkInstaller/gcloud-sdk/google-cloud-sdk/bin'
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 script {
