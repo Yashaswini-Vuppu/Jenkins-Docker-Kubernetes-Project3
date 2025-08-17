@@ -1,5 +1,3 @@
-![Kubernetes Logo](https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.png)
-
 # 🚀 Create CI/CD Pipeline with Jenkins, Docker, and Google Kubernetes Engine (GKE)
 
 In this blog, I’ll walk you through how I built a **fully automated CI/CD pipeline** using Jenkins that integrates with **GitHub, Maven, Docker, DockerHub, Tomcat, and GKE**. This pipeline takes code from source, builds & tests it, packages it as a Docker image, pushes it to DockerHub, and finally deploys it to a Kubernetes cluster running on Google Kubernetes Engine (GKE). All the tools were installed and configured on a **Google Compute Engine (GCE) VM**, which served as my Jenkins controller and execution environment.
