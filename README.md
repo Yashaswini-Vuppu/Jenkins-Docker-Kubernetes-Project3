@@ -36,6 +36,34 @@ Each of these tools is connected to Jenkins with proper authentication:
 
 ---
 
+Authentication Setup
+
+
+
+* **GitHub → Jenkins**: Use GitHub plugin or webhooks. Generate a PAT (Personal Access Token) with repo access and add it in Jenkins credentials.
+
+* **Maven**: Install Maven globally in Jenkins (`Manage Jenkins → Global Tool Configuration`).
+
+* **DockerHub**: Create a Jenkins credential (`username with Password`) with your DockerHub username & token/password.
+
+* **Google Cloud (GKE)**:
+
+ 1. Create a service account with `roles/container.admin` and `roles/viewer`.
+
+ 2. Generate a private key for the service account (JSON format) and download it. Store this file securely since it cannot be recovered if lost.
+
+ 3. In Jenkins, navigate to `Manage Jenkins → Credentials → System → Global credentials → Add Credentials`.
+
+ 4. Select kind: **Google Service Account from Private Key**.
+
+ 5. Provide an ID (e.g., `kubernetes`) and project name.
+
+ 6. Upload the JSON key file and save it.
+
+ 7. Reference this credential in your Jenkinsfile for GKE deployment.
+
+
+
 ## 📊 Jenkins Pipeline in Action
 
 Here’s the execution of my pipeline in Jenkins:
